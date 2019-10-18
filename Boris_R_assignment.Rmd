@@ -1,0 +1,180 @@
+---
+title: "Boris_workflow"
+author: "Boris"
+date: "10/13/2019"
+output: html_document
+---
+A brief description is provided above of each chunk of code
+
+## Downloading data files
+The code below helps to download the two data files needed from our Class Github repository.
+
+```{r}
+
+download.file("https://raw.githubusercontent.com/EEOB-BioData/BCB546X-Fall2019/master/assignments/UNIX_Assignment/snp_position.txt", destfile = "./snp_position.txt")
+
+download.file("https://raw.githubusercontent.com/EEOB-BioData/BCB546X-Fall2019/master/assignments/UNIX_Assignment/fang_et_al_genotypes.txt", destfile = "./fang_et_al_genotypes.txt")
+
+```
+
+## Imopoting data
+
+Here, we first load the package "tidyverse" and then import the two data sets _fang_et_al_genotypes.txt_ and _snp_position.txt_ into the Global environment.They have been named _fang_ and _snp_ respectively.
+
+```{r}
+
+library(tidyverse)
+
+rm(list = ls())  ## First, Delete all previous files in the Global environment
+
+fang <- read_tsv("./fang_et_al_genotypes.txt" )
+snp <- read_tsv("./snp_position.txt")
+
+```
+
+# Part I
+## Data Inspection
+A brief data inspection was carried out to know the number of colums and rows of both data, 
+have a look at the first few rows and columns. We also looked at the structure and summary but decided to comment these lines out because the outputs were very huge.
+
+```{r}
+
+dim(fang)
+dim(snp)
+
+fang[1:10,1:5]
+snp[1:10, 1:5]
+
+#str(fang)
+#str(snp)
+
+#summary(fang)
+#summary(snp)
+
+unique(fang$Group)
+```
+
+## Data processing
+The first part of data processing consisted of filtering the three groups of maize and teosinte then transposing each to have the snps as rows.
+
+```{r}
+Maize_transposed <- filter(fang, Group %in% c("ZMMLR", "ZMMMR", "ZMMIL")) %>% 
+  select(-JG_OTU, -Group) %>% column_to_rownames(., var = "Sample_ID") %>% t() %>%
+  as.data.frame() %>% rownames_to_column(., var = "SNP_ID")
+
+Teosinte_transposed <- filter(fang, Group %in% c("ZMPBA", "ZMPIL", "ZMPJA")) %>% 
+  select(-JG_OTU, -Group) %>% column_to_rownames(., var = "Sample_ID") %>% t() %>%
+  as.data.frame() %>% rownames_to_column(., var = "SNP_ID")
+
+
+
+```
+
+Next, we filtered out only the 3 columns of interest in the snp_position data file. Then we merged it with transposed data for maize and teosinte.
+
+_Please note, SNPs with unknown and multiple positions and chromosomes were filtered out._
+
+```{r}
+snp_formatted <- snp %>% select(SNP_ID, Chromosome, Position)
+
+Maize_merged <- merge(snp_formatted, Maize_transposed ) %>% 
+  filter(., Position != "multiple",  Chromosome != "unknown")
+
+Teosinte_merged <- merge(snp_formatted, Teosinte_transposed) %>% 
+  filter(., Position != "multiple",  Chromosome != "unknown")
+```
+
+After creating the merged files, we used the _mutate_all_ and _gsub_ functions to replace all the "?" by "-" fothe both maize and tesointe.
+
+```{r}
+Maize_replaced <- Maize_merged %>% mutate_all(function(x) gsub("\\?", "\\-",x))
+Teosinte_replaced <- Teosinte_merged %>% mutate_all(function(x) gsub("\\?", "\\-",x))
+```
+
+## File creation
+Here, we used a _for loop_ to generate all the 40 files at once.
+
+```{r}
+for (i in 1:10) {
+  
+  m1 <- Maize_merged %>% filter(., Chromosome == i[1]) %>% arrange(.,as.numeric(Position))
+  m2 <- Maize_replaced %>% filter(., Chromosome == i[1]) %>% arrange(.,desc(as.numeric(Position)))
+  
+  write_tsv(m1, paste("Maize_chr", i[1], "increasing.txt", sep = "_"))
+  write_tsv(m2, paste("Maize_chr", i[1], "decreasing.txt", sep = "_"))
+  
+  t1 <- filter(Teosinte_merged, Chromosome == i[1]) %>% arrange(., as.numeric(Position))
+  t2 <- filter(Teosinte_replaced, Chromosome == i[1]) %>% arrange(., desc(as.numeric(Position)))
+  
+  write_tsv(t1, paste("Teosinte_chr", i[1], "_increasing.txt", sep = "_"))
+  write_tsv(t2, paste("Teosinte_chr", i[1], "_decreasing.txt", sep = "_"))
+  
+}
+```
+
+# Part II
+## Data processing
+Some further data processing was done prior to visualization Here, we transposed and merged the entire _fang_et_al_genotype.txt_ file with the _snp_position.txt_.
+
+_Here too, SNPs with unknown and multiple positions and chromosomes were filtered out._
+
+```{r}
+Fang_transposed <- fang %>% select(-JG_OTU, -Group) %>% column_to_rownames(., var = "Sample_ID") %>% 
+  t() %>% as.data.frame() %>% rownames_to_column(., var = "SNP_ID")
+
+Fang_merged <- merge(snp_formatted, Fang_transposed ) %>% 
+  filter(., Position != "multiple",  Position != "unknown")
+```
+
+## Data visualization
+Here, we created a bargraph to plot the total number of SNPs per chromosome using _ggplot_ and its component _geom_bar_
+
+```{r}
+ggplot(Fang_merged, aes(x= as.character(Chromosome))) + geom_bar(aes(fill = as.character(Chromosome))) + theme_bw()
+```
+
+Next, we created a density plot to show the distribution of SNPs on chromosome using _ggplot_ and its components _geom_density_ and _facet_wrap_
+
+```{r}
+ggplot(Fang_merged, aes(x= as.numeric(Position))) + geom_density(aes(fill = Chromosome)) + facet_wrap(~ Chromosome, nrow = 2, ncol = 5) + theme_bw()
+```
+
+## Further data processing
+The original _fang_et_al_genotypes.txt_ data was not tidy. So, I we first made it tidy using _pivot_long_ function. Next, we used _mutate_ and _ifelse_ to substitute the genotypic sequence by homo, hetero and missing.
+
+```{r}
+tidy_fang <- fang %>% select(-JG_OTU) %>% 
+  pivot_longer( -Sample_ID:-Group, names_to = "SNP_ID", values_to = "Sequence")
+
+tidy_fang <- tidy_fang %>% 
+  mutate(new_sequence = ifelse(Sequence %in% c("A/A","T/T","C/C","G/G"), "Homozygous", 
+  ifelse(Sequence == "?/?", "Missing","Heterozygous")))
+```
+
+## Data visualization
+Here, we created a stacked bargraph to show the standardized proportion of homozygot, heterozygot and missing sites for all the 2782 samples.
+
+```{r}
+ggplot(tidy_fang, aes(x = Sample_ID, fill = new_sequence)) + 
+  geom_bar(position = "fill") + theme_bw()
+```
+
+Another stacked bargraph was created to show the standardized proportion of homozygot, heterozygot and missing sites for all the 16 groups.
+```{r}
+ggplot(tidy_fang, aes(x = Group , fill = new_sequence)) + geom_bar(position = "fill") + 
+  theme_bw() + theme(axis.text.x = element_text(angle = 90))
+```
+
+### My own visualization
+I was interested in seeing the _standardized proportion_ of each of the 11 distinct genotypes for each sample (bargraph) and group (pie chart).
+
+```{r}
+ggplot(filter(tidy_fang, Sequence != "?/?") , aes(x = Sample_ID, fill = Sequence)) + 
+  geom_bar(position = "fill") + theme_bw()
+```
+
+```{r}
+ggplot(filter(tidy_fang, Sequence != "?/?") , aes(x = Group, fill = Sequence)) + 
+  geom_bar (position = "fill") + coord_polar() +theme_bw()
+```
+
