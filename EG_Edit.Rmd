@@ -1,0 +1,36 @@
+---
+title: "Review of Boris R_Workflow"
+author: "Elizabeth Glynne"
+date: "10/21/2019"
+output: html_document
+---
+
+# Summary
+
+Overall your workflow was very efficient and easy to follow. 
+You made great use of the pipline aspect which made the speed of the analysis fast. 
+I also really like how you had the data organized into the respective files so it was easy to view in the github interface online.
+The markdown document was wonderful to read, paying attention to denote various details such as functions mentioned in text or using italics for notes.
+
+# Comments, Questions and Concerns:
+## Part I:
+  - Line 20: Small typo
+  - Line 28: Clearing the environment
+    This is nice and sets a clean environment for each rerun. 
+  - Line 48-52 have been marked as comments within your file. Is there a reason for this?
+  - Amazing function of the loop for line 98!
+  
+## Part II:
+### Bargraph:
+  - Your bargraph X axis title is _"as.character(Chromosome)"_ 
+  - I also like that you did not include the Multiple or Unknown in this format. 
+  - I don't know that the addition of the color here adds any additional layer of information to the graph outside of making it more attractive to the eye. 
+
+### Density Plot:
+  - I like that the colors match to the bar graph chromosome figure
+  - X axis title again is listing a portion of the R code _"as.numeric(Position)"_
+
+### Stacked Bargraphs
+  - These were my favorite and most informative figures for me.
+  - I like that you used showed the Hetero, Homo, and Missing with different colors. 
+
